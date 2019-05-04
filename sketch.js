@@ -1,25 +1,27 @@
 
-let bird;
+let birds = [];
 let brain;
 let pipes = [];
-let collide = false;
 let points = 0;
 let earnedPoint = false;
 let died = false;
-let died2 = false;
 
 let pointsDiv, randDiv;
 
 let u = 0;
 
+
+
 function setup() {
   createCanvas(1200, 675);
-  bird = new Bird();
   tf.setBackend('cpu');
-  brain = new Brain(5);
+
+  for(let i = 0; i < 50; i++) {
+    birds.push(new Bird());
+  }
+  brain = new Brain(3);
   reset();
-  died = false;
-  died2 = false;
+
   this.shouldUpdate = false;
   update();
   setInterval(function() {
@@ -27,6 +29,7 @@ function setup() {
           update();
       }
   }, 0);
+
   pointDiv = createDiv('');
   randDiv = createDiv('');
   q1 = createDiv('');
@@ -37,12 +40,10 @@ function setup() {
 function reset() {
     pipes = [];
     for(let i = 0; i < 5; i++) {
-        pipes.push(new Pipe(500 + i*500));
+        pipes.push(new Pipe(PIPE_GAP + i*PIPE_GAP));
     }
-    bird.init();
-    collide = false;
+    for(let b of birds) b.init();
     died = false;
-    died2 = false;
 }
 
 function keyPressed() {
@@ -56,27 +57,27 @@ function update() {
     maxX = 0;
     for(let pipe of pipes) {
         pipe.update();
-        if(pipe.hit(bird)) collide = true;
         if(pipe.x + pipe.w >= 0) pipesNew.push(pipe);
         else addPipe = true;
         if(pipe.x > maxX) maxX = pipe.x;
+        /*
         if(!pipe.passed && bird.x > pipe.x + pipe.w) {
             pipe.passed = true;
             earnedPoint = true;
             points++;
         }
+        */
     }
-    if(addPipe) pipesNew.push(new Pipe(maxX + 500));
+    if(addPipe) pipesNew.push(new Pipe(maxX + PIPE_GAP));
     pipes = pipesNew;
 
-    bird.update(1.0/60);
+    for(let b of birds) b.update(pipes, 1.0/60);
 
-    died = collide;
-    died2 = bird.y + bird.r > height || bird.y - bird.r < 0;
-    brain.process(this, bird, pipes, earnedPoint, died, died2, true);
+    died = birds.every((b) => b.dead);
+    brain.process(this, birds, pipes, earnedPoint);
     earnedPoint = false;
 
-    if(died || died2) reset();
+    if(died) reset();
 }
 
 function draw() {
@@ -85,7 +86,9 @@ function draw() {
   pointDiv.html(points);
   randDiv.html(randthresh);
 
+  birds.forEach((b, i) => {
+    if(!b.dead) b.draw();
+  });
   for(let pipe of pipes) pipe.draw();
-  bird.draw();
 
 }
