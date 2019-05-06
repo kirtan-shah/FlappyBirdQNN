@@ -1,18 +1,19 @@
 
 const gamma = .9;
 const randdecay = .9999;
-let randthresh = 1;
+let randthresh = .1;
 
-const PIPE_GAP = 250.0;
+const PIPE_GAP = 500.0;
 
 class Brain {
 
     constructor(num_inputs) {
         this.num_inputs = num_inputs;
         this.nn = tf.sequential();
-        this.nn.add(tf.layers.dense({ units: 16, inputShape: [num_inputs], activation: 'elu', kernelRegularizer: tf.regularizers.l2(1e-2), biasRegularizer: tf.regularizers.l2(1e-2) })); //hidden layer with size 10
-        this.nn.add(tf.layers.dense({ units: 2, activation: 'linear', kernelRegularizer: tf.regularizers.l2(1e-2), biasRegularizer: tf.regularizers.l2(1e-2) }));  //q value, linear
-        this.nn.compile({optimizer: 'sgd', lr: .01,  loss: 'meanSquaredError'});
+        //kernelRegularizer: tf.regularizers.l2(1e-2), biasRegularizer: tf.regularizers.l2(1e-2)
+        this.nn.add(tf.layers.dense({ units: 10, inputShape: [num_inputs], activation: 'relu' })); //hidden layer with size 10
+        this.nn.add(tf.layers.dense({ units: 2, activation: 'linear' }));  //q value, linear
+        this.nn.compile({optimizer: 'adam', lr: .003,  loss: 'meanSquaredError'});
     }
 
     predict(inputs) {
@@ -22,59 +23,69 @@ class Brain {
         return out;
     }
 
-    process(app, birds, pipes, earnedPoint) {
+    process(app, b, game) {
 
-      let inputsM = [];
-      let outputsM = [];
-      for(let bird of birds) {
-        if(bird.dead && !bird.justDead) continue;
-        let p = bird.getClosestPipe(pipes);
+      let inputsM = []; //states
+      let qs = []; //original q values
+      let actions = []; //actions
+      let outputsM = []; //states'
+      let liveBirds = [];
+      for(let bird of game.birds) {
+        if(bird.dead) continue;
+        liveBirds.push(bird);
 
-        //inputs - top pos, bottom pos, closest pipe dist, bird height, bird velocity
-        let inputs = [ ((p.top + GAP) - bird.y) / height, (p.x - bird.x) / PIPE_GAP, (bird.velocity) / 400];
+        let inputs = game.getState(bird);
         inputsM.push(inputs);
         let Q = this.predict(inputs);
+        qs.push(Q);
         let Q_jump = Q[0];
         let Q_stay = Q[1];
-        let R = .01;
-        //if(earnedPoint) R = 2;
-        if(bird.justDead) R = -10;
+        //let R = .1;
+        //if(bird.justDead) R = -10;
 
-        //console.log(Math.round(Q_jump*10000)/10000, Math.round(Q_stay*10000)/10000, R + gamma*Math.max(Q_jump, Q_stay));
-        //console.log(R, Q_jump - Q_stay);
-        let randAction = Math.random() < (randthresh);
-        let actionJump = randAction ? (Math.random() < .001) : (Q_jump > Q_stay);
+        //console.log(Q_jump.toFixed(2), Q_stay.toFixed(2));
+
+        let randAction = Math.random() < randthresh;
+        let actionJump = randAction ? (Math.random() < .3) : (Q_jump > Q_stay);
+        actions.push(actionJump ? 1 : 0);
         let X;
         let y;
         if(actionJump) {
             bird.jump();
-            //X = tf.tensor2d([inputs], [1, this.num_inputs]);//tf.tensor2d([inputs.concat([1, 0])], [1, 7]);
-            //let actual = R + gamma * Q_jump;
-            //y = tf.tensor2d([[actual, Q_stay]], [1, 2]);
-            outputsM.push([R + gamma * Q_jump, Q_stay]);
+            //outputsM.push([R + gamma * Q_jump, Q_stay]);
         }
         else {
             //X = tf.tensor2d([inputs], [1, this.num_inputs]); //tf.tensor2d([inputs.concat([0, 1])], [1, 7]);
-            outputsM.push([Q_jump, R + gamma * Q_stay]);
+            //outputsM.push([Q_jump, R + gamma * Q_stay]);
         }
       }
+
+      //do actions, get reward
+      let R_vals = game.update(actions);
+      for(let i = 0; i < actions.length; i++) {
+        let Q_prime = this.predict(game.getState(liveBirds[i]));
+        let actual = R_vals[i] + gamma * Math.max(Q_prime[0], Q_prime[1]);
+        //console.log(actual, R_vals[i], Q_prime);
+        let data = actions[i] == 0 ? [qs[i][0], actual] : [actual, qs[i][1]];
+        outputsM.push(data);
+      }
+      //console.log(inputsM);
+
       let X = tf.tensor2d(inputsM, [inputsM.length, this.num_inputs]);
       let y = tf.tensor2d(outputsM, [outputsM.length, 2]);
       this.nn.fit(X, y).then(() => { app.shouldUpdate = true; });
-        /*
-        if(q1) {
-            q1.style('color', 'black');
-            q2.style('color', 'black');
-            if(Q_jump > Q_stay) q1.style('color', 'green');
-            else q2.style('color', 'green');
-            q1.html(Math.round(Q_jump*10000)/10000 + " " + (R + gamma * Q_jump));
-            q2.html(Math.round(Q_stay*10000)/10000 + " " + (R + gamma * Q_stay));
-        }*/
-        //this.nn.fit(X, y).then(() => { app.shouldUpdate = true; });
-        //else app.shouldUpdate = true;
-        randthresh *= randdecay;
+
+      randthresh *= randdecay;
+
+      let inputs = game.getState(b);
+      let Q = this.predict(inputs);
+      if(Q[0] > Q[1]) b.jump();
+
+      game.allDead = game.allDead && b.dead;
+
 
     }
+
 
     // actual= R + γ max A` Q(S`, A`)
 

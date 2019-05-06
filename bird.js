@@ -8,7 +8,7 @@ class Bird {
     }
 
     init() {
-        this.r = SIZE/2
+        this.r = SIZE/2;
         this.x = 100;
         this.y = random(200, height - 200);
         this.velocity = 0;
@@ -48,8 +48,9 @@ class Bird {
         this.dead = dead;
     }
 
-    draw() {
-        fill(255, 0, 0, 150);
+    draw(blue) {
+        if(blue) fill(255, 0, 0);
+        else fill(100, 120);
         ellipse(this.x, this.y, SIZE, SIZE);
     }
 }
