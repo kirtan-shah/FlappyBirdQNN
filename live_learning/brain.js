@@ -3,7 +3,7 @@ const gamma = .9;
 const randdecay = .9999;
 let randthresh = .1;
 
-const PIPE_GAP = 500.0;
+const PIPE_GAP = 1000.0;
 
 class Brain {
 
@@ -13,7 +13,7 @@ class Brain {
         //kernelRegularizer: tf.regularizers.l2(1e-2), biasRegularizer: tf.regularizers.l2(1e-2)
         this.nn.add(tf.layers.dense({ units: 10, inputShape: [num_inputs], activation: 'relu' })); //hidden layer with size 10
         this.nn.add(tf.layers.dense({ units: 2, activation: 'linear' }));  //q value, linear
-        this.nn.compile({optimizer: 'adam', lr: .003,  loss: 'meanSquaredError'});
+        this.nn.compile({optimizer: 'adam', lr: .01,  loss: 'meanSquaredError'});
     }
 
     predict(inputs) {

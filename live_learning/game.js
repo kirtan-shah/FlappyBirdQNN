@@ -5,7 +5,7 @@ class Game {
     this.allDead = false;
     this.birds = [];
     this.pipes = [];
-    this.numbirds = 10;
+    this.numbirds = 100;
     this.reset();
   }
 

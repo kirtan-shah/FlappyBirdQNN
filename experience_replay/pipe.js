@@ -1,5 +1,5 @@
 
-const GAP = 300;
+const GAP = 200;
 const WIDTH = 70;
 
 class Pipe {
